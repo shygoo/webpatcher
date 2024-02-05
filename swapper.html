@@ -1,0 +1,137 @@
+<head>
+<title>Hack64 - N64 ROM Swapper</title>
+<link href='https://fonts.googleapis.com/css?family=Open+Sans:400,400italic,700,700italic' rel='stylesheet' type='text/css'>
+<style>
+td {
+    padding: 10px;
+}
+body {
+    background: rgb(32,34,37);
+    color: #EEE;
+}
+body, table, input {
+    font-size: 14px;
+    font-family: 'Open Sans';
+}
+a {
+    text-decoration: none;
+    color: #30A2EC;
+}
+a:visited
+{
+    color: #30A2EC;
+}
+
+input[type='file']
+{
+    background-color: rgba(0,0,0,0.15);
+    padding: 10px;
+}
+
+input[type='text']
+{
+    padding: 5px;
+    border: none;
+    background-color: #EEE;
+}
+</style>
+</head>
+<body>
+<div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
+    <div style="flex: 1;"></div>
+    <div style="flex: 1; flex-grow: 0; text-align: center;">
+        <div style="display: inline-block;">
+            <div style="background-color: rgb(47,49,54); padding: 10px;">
+                <div style="font-size: 24px;">Web Swapper</div>
+                <div style="font-size: 11px; color: #888;">.n64/.v64 to .z64</div>
+            </div>
+            <table style="background-color: rgb(47,49,54); padding: 10px;">
+                <tr><td>ROM</td><td><input type="file" id="input-rom" accept=".n64, .v64"></td></tr>
+            </table>
+            <div style="background: #666; text-align: left;">
+                <div id="progress-bar" style="display: inline-block; height: 2px; width: 0px; background: #0FF;"></div>
+            </div>
+        </div>
+        <div style="font-size: 12px; margin-top:10px;"><a href="/">Home</a></div>
+    </div>
+    <div style="flex: 1;"></div>
+</div>
+<script>
+var inputFileName = null;
+var domFile = document.querySelector('#input-rom');
+
+domFile.onchange = function()
+{
+    var reader = new FileReader();
+    reader.onloadend = function()
+    {
+        var romdv = new DataView(reader.result);
+        swapAndSaveRom(romdv);
+    }
+    inputFileName = this.files[0].name;
+    reader.readAsArrayBuffer(this.files[0]);
+}
+
+function swapAndSaveRom(romdv)
+{
+    var word = romdv.getUint32(0x00000000);
+    var domProgressBar = document.querySelector('#progress-bar');
+
+    switch(word)
+    {
+    case 0x37804012:
+        for(var i = 0; i < romdv.byteLength; i += 2)
+        {
+            romdv.setUint16(i, romdv.getUint16(i, true));
+        }
+        break;
+    case 0x40123780:
+        for(var i = 0; i < romdv.byteLength; i+= 4)
+        {
+            romdv.setUint32(i, romdv.getUint32(i, true));
+        }
+        break;
+    case 0x80371240:
+        alert("ROM already uses Z64 byte ordering");
+        return;
+    default:
+        alert("Error: Format identification failed");
+        return;
+    }
+
+    var outputFileName = inputFileName.replace(/\.[a-zA-Z\d]+$/, ".z64");
+    saveAs(outputFileName, romdv.buffer);
+    domProgressBar.style.width = "0px";
+}
+
+function saveAs(filename, data)
+{
+    var blob = new Blob([data], {type: 'octet/stream'});
+    var url = window.URL.createObjectURL(blob);
+
+    if(navigator && navigator.msSaveBlob)
+    {
+        navigator.msSaveBlob(blob, filename);
+    }
+    else
+    {
+        var a = document.createElement('a');
+        a.style = "display: none";
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        try
+        {
+            a.click();
+        }
+        catch(e)
+        {
+            console.error(e);
+            console.log('failed to save file');
+        }
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    }
+}
+</script>
+</body>
